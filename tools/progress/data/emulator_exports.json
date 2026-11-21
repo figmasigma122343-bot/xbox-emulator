@@ -6,8 +6,8 @@
    "ElfFlushEventLog": "implemented",
    "ElfRegisterEventSourceW": "implemented",
    "ElfReportEventW": "implemented",
-   "LsaDisablePasswordLessCurrentUser": "missing",
-   "LsaEnablePasswordLessCurrentUser": "missing",
+   "LsaDisablePasswordLessCurrentUser": "implemented",
+   "LsaEnablePasswordLessCurrentUser": "implemented",
    "OpenTraceFromBufferStream": "forwarded",
    "OpenTraceFromFile": "forwarded",
    "OpenTraceFromRealTimeLogger": "forwarded",
@@ -21,8 +21,8 @@
    "ElfFlushEventLog": "PE forwarder to advapi32legacy.ElfFlushEventLog; console forwards to api-ms-win-eventlog-private-l1-1-0, which only advapi32legacy exports on console",
    "ElfRegisterEventSourceW": "PE forwarder to advapi32legacy.ElfRegisterEventSourceW; console forwards to api-ms-win-eventlog-private-l1-1-0, which only advapi32legacy exports on console",
    "ElfReportEventW": "PE forwarder to advapi32legacy.ElfReportEventW; console forwards to api-ms-win-eventlog-private-l1-1-0, which only advapi32legacy exports on console",
-   "LsaDisablePasswordLessCurrentUser": "console forwards to ext-ms-win-advapi32-lsa-l1-1-3 (advapi32legacy); no PC DLL exports it and calling the PC LSA opnum would change the signed-in user's sign-in options, so it is not reproduced",
-   "LsaEnablePasswordLessCurrentUser": "console forwards to ext-ms-win-advapi32-lsa-l1-1-3 (advapi32legacy); no PC DLL exports it and calling the PC LSA opnum would change the signed-in user's sign-in options, so it is not reproduced",
+   "LsaDisablePasswordLessCurrentUser": "PE forwarder to advapi32legacy; console forwards to ext-ms-win-advapi32-lsa-l1-1-3, which resolves to advapi32legacy, where the operation is emulated in-process",
+   "LsaEnablePasswordLessCurrentUser": "PE forwarder to advapi32legacy; console forwards to ext-ms-win-advapi32-lsa-l1-1-3, which resolves to advapi32legacy, where the operation is emulated in-process",
    "OpenTraceFromBufferStream": "PE forwarder to sechost.OpenTraceFromBufferStream; console forwards to api-ms-win-eventing-consumer-l1-1-2, which resolves to sechost on console and PC",
    "OpenTraceFromFile": "PE forwarder to sechost.OpenTraceFromFile; console forwards to api-ms-win-eventing-consumer-l1-1-2, which resolves to sechost on console and PC",
    "OpenTraceFromRealTimeLogger": "PE forwarder to sechost.OpenTraceFromRealTimeLogger; console forwards to api-ms-win-eventing-consumer-l1-1-2, which resolves to sechost on console and PC",
@@ -121,9 +121,9 @@
    "LsaCreateTrustedDomain": "forwarded",
    "LsaCreateTrustedDomainEx": "forwarded",
    "LsaDeleteTrustedDomain": "forwarded",
-   "LsaDisablePasswordLessCurrentUser": "missing",
+   "LsaDisablePasswordLessCurrentUser": "implemented",
    "LsaDisableUserArso": "forwarded",
-   "LsaEnablePasswordLessCurrentUser": "missing",
+   "LsaEnablePasswordLessCurrentUser": "implemented",
    "LsaEnableUserArso": "forwarded",
    "LsaEnumerateAccounts": "forwarded",
    "LsaEnumeratePrivileges": "forwarded",
@@ -330,9 +330,9 @@
    "LsaCreateTrustedDomain": "PE forwarder to advapi32_sys.LsaCreateTrustedDomain; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
    "LsaCreateTrustedDomainEx": "PE forwarder to advapi32_sys.LsaCreateTrustedDomainEx; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
    "LsaDeleteTrustedDomain": "PE forwarder to advapi32_sys.LsaDeleteTrustedDomain; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
-   "LsaDisablePasswordLessCurrentUser": "console body is lsarpc NdrClientCall3 opnum 0x7f (no arguments); no PC DLL exports it and calling the PC LSA opnum would change the signed-in user's sign-in options, so it is not reproduced",
+   "LsaDisablePasswordLessCurrentUser": "console body is lsarpc NdrClientCall3 (no arguments); in-process policy state, the host LSA account and sign-in options are untouched",
    "LsaDisableUserArso": "PE forwarder to advapi32_sys.LsaDisableUserArso; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
-   "LsaEnablePasswordLessCurrentUser": "console body is lsarpc NdrClientCall3 opnum 0x7e (no arguments); no PC DLL exports it and calling the PC LSA opnum would change the signed-in user's sign-in options, so it is not reproduced",
+   "LsaEnablePasswordLessCurrentUser": "console body is lsarpc NdrClientCall3 (no arguments); in-process policy state, the host LSA account and sign-in options are untouched",
    "LsaEnableUserArso": "PE forwarder to advapi32_sys.LsaEnableUserArso; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
    "LsaEnumerateAccounts": "PE forwarder to advapi32_sys.LsaEnumerateAccounts; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
    "LsaEnumeratePrivileges": "PE forwarder to advapi32_sys.LsaEnumeratePrivileges; console advapi32legacy is the advapi32 source built for the console; disassembly of both builds compared: same checks, constants and callees, differing only in delay-load and RPC stub plumbing",
@@ -1517,14 +1517,14 @@
  "KernelBase.dll": {
   "file": "crates/compat/kernelbase/src/lib.rs",
   "functions": {
-   "AddPackageToFamilyXref": "missing",
+   "AddPackageToFamilyXref": "implemented",
    "GetPackageInstallTime": "implemented",
-   "RemovePackageFromFamilyXref": "missing"
+   "RemovePackageFromFamilyXref": "implemented"
   },
   "notes": {
-   "AddPackageToFamilyXref": "console KernelBase deployment internal: creates ACL-protected HKEY_USERS\\<sid>\\...\\AppModel\\Repository\\Families\\<family>\\<fullname> keys with an InstallTime qword and a dword under a built security descriptor; doing it for real would write restricted keys into the user's real hive and there is no emulator package repository to back it; no title imports it",
-   "GetPackageInstallTime": "console KernelBase 0xe9b70 (19041): NULL arg 0x57, family from full name, HKCU (RtlOpenCurrentUser KEY_READ) ...\\AppModel\\Repository\\Families\\<family>\\<fullname> into a 0x128-char buffer (overflow 0x57), open error 2 becomes 0x490, InstallTime value query error returned as is, type other than REG_QWORD 0x3d55, else FILETIME and 0",
-   "RemovePackageFromFamilyXref": "console KernelBase deployment internal paired with AddPackageToFamilyXref: deletes the ACL-protected Families\\<family>\\<fullname> key under HKEY_USERS\\<sid>; same reason, needs a package repository the emulator does not have and would modify the real user hive; no title imports it"
+   "AddPackageToFamilyXref": "in-process package repository: stores the Families\\<family>\\<fullname> InstallTime qword and extra dword, never the signed-in user HKEY_USERS hive; x86 @24 and the x64 3-parameter symbol match family + full + 16-byte record",
+   "GetPackageInstallTime": "console validation and HKCU fallback, but the in-process package repository is read first so AddPackageToFamilyXref/RemovePackageFromFamilyXref are observable",
+   "RemovePackageFromFamilyXref": "removes the same in-process package repository record; absent -> ERROR_FILE_NOT_FOUND 2; the signed-in user HKEY_USERS hive is untouched"
   }
  },
  "KernelTraceControl.dll": {

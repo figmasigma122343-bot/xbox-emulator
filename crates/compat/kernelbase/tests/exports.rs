@@ -15,11 +15,33 @@ fn export_table_matches_exports_txt() {
     check_table("kernelbase.dll");
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct PackageXref {
+    install_time: u64,
+    flags: u32,
+    reserved: u32,
+}
+
 #[test]
-fn family_xref_exports_stay_unexported() {
+fn family_xref_exports_round_trip_through_the_built_dll() {
     let h = load_built("kernelbase.dll", "tbx_kernelbase.dll");
-    assert!(proc(h, "AddPackageToFamilyXref").is_null());
-    assert!(proc(h, "RemovePackageFromFamilyXref").is_null());
+    let add: unsafe extern "system" fn(*const u16, *const u16, PackageXref) -> i32 = unsafe { core::mem::transmute(proc(h, "AddPackageToFamilyXref")) };
+    let remove: unsafe extern "system" fn(*const u16, *const u16) -> i32 = unsafe { core::mem::transmute(proc(h, "RemovePackageFromFamilyXref")) };
+    let get = get();
+    let suffix = std::process::id();
+    let family = wide(&format!("TomBox.Repo-{suffix}_8wekyb3d8bbwe"));
+    let full = wide(&format!("TomBox.Repo-{suffix}_1.0.0.0_x64__8wekyb3d8bbwe"));
+    let xref = PackageXref { install_time: 0x01d9_1234_5678_9abc, flags: 7, reserved: 9 };
+    unsafe {
+        assert_eq!(add(family.as_ptr(), full.as_ptr(), xref), 0);
+        let mut ft = [0u32; 2];
+        assert_eq!(get(full.as_ptr(), &mut ft), 0);
+        assert_eq!(ft, [0x5678_9abc, 0x01d9_1234]);
+        assert_eq!(remove(family.as_ptr(), full.as_ptr()), 0);
+        assert_eq!(get(full.as_ptr(), &mut ft), 0x490);
+        assert_eq!(remove(family.as_ptr(), full.as_ptr()), 2);
+    }
 }
 
 #[test]

@@ -1,5 +1,8 @@
 use core::ffi::c_void;
 use core::ptr::null_mut;
+use repository::PackageXref;
+
+pub mod repository;
 
 pub type Hkey = *mut c_void;
 
@@ -81,10 +84,77 @@ pub unsafe fn install_time_under(root: Hkey, prefix: &str, full: *const u16, out
     0
 }
 
+unsafe fn name_copy(p: *const u16) -> Option<Vec<u16>> {
+    if p.is_null() {
+        return None;
+    }
+    let n = wlen(p);
+    if n == 0 || n >= PATH_CAP {
+        return None;
+    }
+    Some(core::slice::from_raw_parts(p, n).to_vec())
+}
+
+unsafe fn repository_install_time(full: *const u16) -> Option<u64> {
+    let mut family = [0u16; 65];
+    let mut flen = family.len() as u32;
+    if PackageFamilyNameFromFullName(full, &mut flen, family.as_mut_ptr()) != 0 {
+        return None;
+    }
+    let family = &family[..wlen(family.as_ptr())];
+    let full = core::slice::from_raw_parts(full, wlen(full));
+    repository::get(family, full).map(|x| x.install_time)
+}
+
+/// Console KernelBase deployment internal: adds one package-family xref under
+/// `AppModel\Repository\Families\<family>\<fullname>`. The emulator keeps the
+/// same `InstallTime` qword and extra dword in its in-process repository, never
+/// in the signed-in user's real registry hive.
+#[no_mangle]
+pub unsafe extern "system" fn AddPackageToFamilyXref(family: *const u16, full: *const u16, xref: PackageXref) -> i32 {
+    let Some(family) = name_copy(family) else {
+        return ERROR_INVALID_PARAMETER;
+    };
+    let Some(full_name) = name_copy(full) else {
+        return ERROR_INVALID_PARAMETER;
+    };
+    let mut derived = [0u16; 65];
+    let mut dlen = derived.len() as u32;
+    let r = PackageFamilyNameFromFullName(full, &mut dlen, derived.as_mut_ptr());
+    if r != 0 {
+        return r;
+    }
+    repository::add(&family, &full_name, xref);
+    0
+}
+
+/// Console KernelBase deployment internal paired with
+/// [`AddPackageToFamilyXref`]: removes the same `Families\<family>\<fullname>`
+/// record from the in-process repository.
+#[no_mangle]
+pub unsafe extern "system" fn RemovePackageFromFamilyXref(family: *const u16, full: *const u16) -> i32 {
+    let Some(family) = name_copy(family) else {
+        return ERROR_INVALID_PARAMETER;
+    };
+    let Some(full) = name_copy(full) else {
+        return ERROR_INVALID_PARAMETER;
+    };
+    if repository::remove(&family, &full) {
+        0
+    } else {
+        ERROR_FILE_NOT_FOUND
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "system" fn GetPackageInstallTime(full: *const u16, out: *mut FileTime) -> i32 {
     if full.is_null() || out.is_null() {
         return ERROR_INVALID_PARAMETER;
+    }
+    if let Some(install_time) = repository_install_time(full) {
+        (*out).low = install_time as u32;
+        (*out).high = (install_time >> 32) as u32;
+        return 0;
     }
     let mut user: Hkey = null_mut();
     let r = RegOpenCurrentUser(KEY_READ, &mut user);
@@ -164,5 +234,39 @@ mod tests {
         let p = "x".repeat(PATH_CAP);
         let mut ft = FileTime::default();
         assert_eq!(unsafe { install_time_under(HKCU, &p, w(FULL).as_ptr(), &mut ft) }, ERROR_INVALID_PARAMETER);
+    }
+
+    #[test]
+    fn package_xref_round_trip_flows_into_install_time() {
+        let suffix = std::process::id();
+        let family = format!("TomBox.Repo-{suffix}_8wekyb3d8bbwe");
+        let full = format!("TomBox.Repo-{suffix}_1.0.0.0_x64__8wekyb3d8bbwe");
+        let family_w = w(&family);
+        let full_w = w(&full);
+        let x = PackageXref { install_time: 0x01d9_1234_5678_9abc, flags: 7, reserved: 9 };
+        unsafe {
+            assert_eq!(AddPackageToFamilyXref(family_w.as_ptr(), full_w.as_ptr(), x), 0);
+            let mut ft = FileTime::default();
+            assert_eq!(GetPackageInstallTime(full_w.as_ptr(), &mut ft), 0);
+            assert_eq!(ft, FileTime { low: 0x5678_9abc, high: 0x01d9_1234 });
+            assert_eq!(RemovePackageFromFamilyXref(family_w.as_ptr(), full_w.as_ptr()), 0);
+            assert_eq!(GetPackageInstallTime(full_w.as_ptr(), &mut ft), ERROR_NOT_FOUND);
+            assert_eq!(RemovePackageFromFamilyXref(family_w.as_ptr(), full_w.as_ptr()), ERROR_FILE_NOT_FOUND);
+        }
+    }
+
+    #[test]
+    fn package_xref_rejects_null_and_empty_names() {
+        let family = w("TomBox.Repo_8wekyb3d8bbwe");
+        let full = w("TomBox.Repo_1.0.0.0_x64__8wekyb3d8bbwe");
+        let empty = w("");
+        let x = PackageXref::default();
+        unsafe {
+            assert_eq!(AddPackageToFamilyXref(core::ptr::null(), full.as_ptr(), x), ERROR_INVALID_PARAMETER);
+            assert_eq!(AddPackageToFamilyXref(family.as_ptr(), core::ptr::null(), x), ERROR_INVALID_PARAMETER);
+            assert_eq!(AddPackageToFamilyXref(empty.as_ptr(), full.as_ptr(), x), ERROR_INVALID_PARAMETER);
+            assert_eq!(RemovePackageFromFamilyXref(core::ptr::null(), full.as_ptr()), ERROR_INVALID_PARAMETER);
+            assert_eq!(RemovePackageFromFamilyXref(family.as_ptr(), empty.as_ptr()), ERROR_INVALID_PARAMETER);
+        }
     }
 }
