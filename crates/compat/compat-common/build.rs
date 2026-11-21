@@ -3,6 +3,62 @@ use std::path::{Path, PathBuf};
 
 const ROUTED: &[&str] = &["implemented", "forwarded", "hooked"];
 
+/// Private title data. The repository deliberately does not publish these
+/// files; a clean clone still needs them because the online backends include
+/// them at compile time. Create empty placeholders only when a file is absent,
+/// and never overwrite data a contributor already has.
+const BACKEND_DATA: &[(&str, &[u8])] = &[
+    ("fortnite/catalog.json", b"{}"),
+    ("fortnite/keychain.json", b"{}"),
+    ("fortnite/contentpages.json", b"{}"),
+    ("fortnite/epic-settings.json", b"{}"),
+    ("fortnite/sdkv1.json", b"{}"),
+    ("fortnite/timeline.json", b"{}"),
+    ("fortnite/tournament.json", b"{}"),
+    ("fortnite/tournamentandhistory.json", b"{}"),
+    ("fortnite/history.json", b"{}"),
+    ("fortnite/privacy.json", b"{}"),
+    ("fortnite/quests_athena_s14.json", b"{}"),
+    ("fortnite/profile_athena.json", b"{}"),
+    ("fortnite/profile_common_core.json", b"{}"),
+    ("fortnite/profile_common_public.json", b"{}"),
+    ("fortnite/profile_creative.json", b"{}"),
+    ("fortnite/profile_collections.json", b"{}"),
+    ("fortnite/profile_metadata.json", b"{}"),
+    ("fortnite/profile_campaign.json", b"{}"),
+    ("fortnite/DefaultEngine.ini", b""),
+    ("fortnite/DefaultGame.ini", b""),
+    ("fortnite/DefaultInput.ini", b""),
+    ("fortnite/DefaultRuntimeOptions.ini", b""),
+    ("fortnite/video/init.mp4", b""),
+    ("fortnite/video/seg0.m4s", b""),
+    ("fortnite/video/audio_init.mp4", b""),
+    ("fortnite/video/audio_seg0.m4s", b""),
+    ("xdefiant/ubiservices_parameters.json", b"{}"),
+    ("trackmania/core_routes.json", b"{}"),
+];
+
+fn ensure_backend_data(manifest: &Path) {
+    let root = manifest.join("backend_data");
+    let mut made = 0usize;
+    for (relative, contents) in BACKEND_DATA {
+        let path = root.join(relative);
+        if path.is_file() {
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if std::fs::write(&path, contents).is_ok() {
+            made += 1;
+        }
+    }
+    if made != 0 {
+        println!("cargo:warning=compat-common: created {made} empty backend_data placeholder(s); add your own title data to enable the online backends");
+    }
+    println!("cargo:rerun-if-changed={}", root.display());
+}
+
 fn lib_name(toml: &str) -> Option<(String, bool)> {
     let mut in_lib = false;
     let mut name = None;
@@ -58,6 +114,7 @@ fn esc(s: &str) -> String {
 
 fn main() {
     let here = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    ensure_backend_data(&here);
     let compat = here.parent().unwrap().to_path_buf();
     let hosts = here.join("data").join("console_apiset_hosts.txt");
     println!("cargo:rerun-if-changed={}", hosts.display());

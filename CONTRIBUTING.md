@@ -39,6 +39,8 @@ cargo build -p <crate>
 cargo test -p <crate>
 ```
 
+`compat-common` creates empty `backend_data/` placeholders when the private title data is absent, so a clean clone builds. The Fortnite, XDefiant and Trackmania online backends need the real files; the generated placeholders keep the build working and are ignored by Git.
+
 Some crates also need third-party SDKs (the DirectX Agility SDK, DXC, libopus). Their `build.rs` says which.
 
 ## Licence

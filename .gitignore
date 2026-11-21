@@ -24,3 +24,6 @@ secrets/
 games/
 emulator/
 
+# Private title data. build.rs creates empty placeholders for a clean build.
+crates/compat/compat-common/backend_data/
+
